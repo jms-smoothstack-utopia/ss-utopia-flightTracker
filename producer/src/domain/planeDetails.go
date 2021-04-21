@@ -30,7 +30,7 @@ type PlaneDetails struct {
 	status Status
 }
 
-type Status int
+type Status uint8
 
 const(
 	Idle Status = iota

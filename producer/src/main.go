@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"plane-producer/src/domain"
 )
 
@@ -11,27 +10,31 @@ func main() {
 	origin := &domain.Airport{
 		Iata: "ATL",
 		Location: domain.Position{
-			Latitude:  33.640411,
-			Longitude: -84.419853,
+			Latitude:  0,
+			Longitude: 0,
 		},
 	}
 
 	destination := &domain.Airport{
 		Iata: "LAX",
 		Location: domain.Position{
-			Latitude:  33.942791,
-			Longitude: -118.410042,
+			Latitude:  1,
+			Longitude: 1,
 		},
 	}
 
 	a.Init("AB-123", "F123", origin, destination)
+	a.HasClearance = true
 
-	r, err := a.Report()
-	if err != nil {
-		fmt.Print("Error marshalling.")
+	ch := make(chan []byte, 1)
+
+	for a.Status == domain.Idle {
+		a.Travel(1, false, ch)
 	}
-	_, err = os.Stdout.Write(r)
-	if err != nil {
-		return
+
+	for a.Status != domain.Idle {
+		a.Travel(1, false, ch)
+		report := <-ch
+		fmt.Println(string(report))
 	}
 }

@@ -45,26 +45,28 @@ type Aircraft struct {
 	origin      Airport
 	destination Airport
 
-	currentPos Position
+	CurrentPos Position
 	altitude   float64
 
 	// nautical miles
 	nmiToDest    float64
 	nmiTravelled float64
 
-	speedKnots         float64
-	verticalSpeedKnots float64	// TODO change to feet/minute for simplicity
+	speedKnots     float64
+	vSpeedFtPerSec float64
 
 	bearing float64
 
-	hasClearance bool // landing or takeoff dependent on Status
+	HasTakeOffClearance bool
+	HasLandingClearance bool
+	HasClearance bool // landing or takeoff dependent on Status
 
 	Status Status
 }
 
 // Init initializes an Aircraft with the given information.
 // Initial Status is set to Idle
-// Aircraft.currentPos is initialized to the given origin
+// Aircraft.CurrentPos is initialized to the given origin
 // Aircraft.bearing and Aircraft.nmiToDest are calculated and initialized with given arguments.
 // All other fields are 0 initialized.
 func (a *Aircraft) Init(tailNum, flightId string, origin, destination *Airport) {
@@ -73,7 +75,7 @@ func (a *Aircraft) Init(tailNum, flightId string, origin, destination *Airport) 
 
 	a.origin = *origin
 	a.destination = *destination
-	a.currentPos = origin.Location
+	a.CurrentPos = origin.Location
 
 	bearing, distance := origin.Location.CalcVector(&destination.Location)
 	a.bearing = bearing
@@ -93,14 +95,14 @@ func (a *Aircraft) Report() ([]byte, error) {
 		a.tailNum,
 		a.flightId, a.origin.Iata,
 		a.destination.Iata,
-		strconv.FormatFloat(a.currentPos.Latitude, 'f', 5, 64),
-		strconv.FormatFloat(a.currentPos.Longitude, 'f', 5, 64),
+		strconv.FormatFloat(a.CurrentPos.Latitude, 'f', 5, 64),
+		strconv.FormatFloat(a.CurrentPos.Longitude, 'f', 5, 64),
 		strconv.FormatFloat(a.altitude, 'f', 2, 64),
 		strconv.FormatFloat(a.bearing, 'f', 2, 64),
 		strconv.FormatFloat(a.nmiTravelled, 'f', 2, 64),
 		strconv.FormatFloat(a.nmiToDest, 'f', 2, 64),
 		strconv.FormatFloat(a.speedKnots, 'f', 2, 64),
-		strconv.FormatFloat(a.verticalSpeedKnots, 'f', 2, 64),
+		strconv.FormatFloat(a.vSpeedFtPerSec, 'f', 2, 64),
 		string(a.Status),
 	}
 
@@ -126,14 +128,17 @@ type FlightRecord struct {
 func (a *Aircraft) Travel(seconds int, wait bool, report chan<- []byte) {
 	go func() {
 		for i := 0; i < seconds; i++ {
-			travelled := a.speedKnots / 3600
+			if a.Status != AwaitingLanding {
+				//FIXME Either this or distance from destination is not being calculated correctly.
+				travelled := a.speedKnots / 3600
 
-			a.nmiTravelled += travelled
+				a.nmiTravelled += travelled
+				a.altitude += a.vSpeedFtPerSec
 
-			// TODO account for vertical change
-
-			a.currentPos = a.currentPos.DeterminePositionDelta(travelled, a.bearing)
-			a.bearing, a.nmiToDest = a.currentPos.CalcVector(&a.destination.Location)
+				delta := a.CurrentPos.DeterminePositionDelta(travelled, a.bearing)
+				a.CurrentPos = delta
+				a.bearing, a.nmiToDest = a.CurrentPos.CalcVector(&a.destination.Location)
+			}
 
 			a.TransitionState()
 
@@ -158,12 +163,12 @@ func (a *Aircraft) Travel(seconds int, wait bool, report chan<- []byte) {
 // For example, transition from TaxiOut -> TakeOff is only allowed if the current distance of the
 // Aircraft is greater than a specific distance from its origin Airport.
 //
-// NOTE: An Aircraft must be given clearance (by setting a.hasClearance to true)
+// NOTE: An Aircraft must be given clearance (by setting a.HasClearance to true)
 // in order to initiate TakeOff.
 func (a *Aircraft) TransitionState() {
 	switch a.Status {
 	case Idle:
-		a.setTaxi(true)
+		a.setTaxiOut()
 	case TaxiOut:
 		a.setTakeOff()
 	case TakeOff:
@@ -173,38 +178,33 @@ func (a *Aircraft) TransitionState() {
 	case AwaitingLanding:
 		a.setLanding()
 	case Landing:
-		a.setTaxi(false)
+		a.setTaxiIn()
 	case TaxiIn:
 		a.setIdle()
 	}
 }
 
-func (a *Aircraft) setTaxi(out bool) {
-	if !a.hasClearance {
+func (a *Aircraft) setTaxiOut() {
+	if !a.HasClearance {
 		return
 	}
 
-	if out {
-		a.Status = TaxiOut
-	} else {
-		a.Status = TaxiIn
-	}
-
+	a.Status = TaxiOut
 	a.speedKnots = taxiSpeed
-	a.verticalSpeedKnots = 0
+	a.vSpeedFtPerSec = 0
 }
 
 func (a *Aircraft) setTakeOff() {
-	if a.currentPos.CalcDistance(&a.origin.Location) < taxiDistanceFromOrigin {
+	if a.CurrentPos.CalcDistance(&a.origin.Location) < taxiDistanceFromOrigin {
 		return
 	}
 
 	// reset take off clearance for eventual landing clearance.
-	a.hasClearance = false
+	a.HasClearance = false
 
 	a.Status = TakeOff
 	a.speedKnots = takeoffAirspeed
-	a.verticalSpeedKnots = takeoffVerticalSpeed
+	a.vSpeedFtPerSec = takeoffVerticalSpeed
 }
 
 func (a *Aircraft) setCruising() {
@@ -214,7 +214,7 @@ func (a *Aircraft) setCruising() {
 
 	a.Status = Cruising
 	a.speedKnots = cruisingAirspeed
-	a.verticalSpeedKnots = 0
+	a.vSpeedFtPerSec = 0
 }
 
 func (a *Aircraft) setAwaitingLanding() {
@@ -229,27 +229,37 @@ func (a *Aircraft) setAwaitingLanding() {
 	a.Status = AwaitingLanding
 
 	a.speedKnots = awaitingLandingAirspeed
-	a.verticalSpeedKnots = 0
+	a.vSpeedFtPerSec = 0
 }
 
 func (a *Aircraft) awaitClearance() {
 	go func() {
-		time.Sleep(time.Second * time.Duration(clearanceWaitSeconds))
-		a.hasClearance = true
+		time.Sleep(time.Second * time.Duration(ClearanceWaitSeconds))
+		a.HasClearance = true
 	}()
 }
 
 func (a *Aircraft) setLanding() {
-	if a.hasClearance {
+	if !a.HasClearance {
 		return
 	}
 
 	// reset landing clearance for eventual take off clearance
-	a.hasClearance = false
+	a.HasClearance = false
 
 	a.Status = Landing
 	a.speedKnots = landingAirSpeed
-	a.verticalSpeedKnots = landingVerticalSpeed
+	a.vSpeedFtPerSec = landingVerticalSpeed
+}
+
+func (a *Aircraft) setTaxiIn() {
+	if a.altitude > 0 {
+		return
+	}
+
+	a.Status = TaxiIn
+	a.speedKnots = taxiSpeed
+	a.vSpeedFtPerSec = 0
 }
 
 func (a *Aircraft) setIdle() {
@@ -264,5 +274,5 @@ func (a *Aircraft) setIdle() {
 	a.Status = Idle
 
 	a.speedKnots = 0
-	a.verticalSpeedKnots = 0
+	a.vSpeedFtPerSec = 0
 }

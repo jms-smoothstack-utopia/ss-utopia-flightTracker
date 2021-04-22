@@ -6,7 +6,7 @@ const NauticalMilesPerMeter = 0.0005399565
 const (
 	taxiSpeed               = 15
 	takeoffAirspeed         = 150
-	takeoffVerticalSpeed    = 15
+	takeoffVerticalSpeed    = 25	// feet per second
 	cruisingAirspeed        = 300
 	cruisingAltitude        = 35_000
 	awaitingLandingAirspeed = 200
@@ -17,7 +17,7 @@ const (
 const (
 	taxiDistanceFromOrigin      = 2
 	awaitingLandingDistance     = 10
-	idleDistanceFromDestination = 0
+	idleDistanceFromDestination = 0.1
 )
 
-var clearanceWaitSeconds = 120
+var ClearanceWaitSeconds = 120

@@ -1,102 +1,61 @@
 package domain
 
 import (
-	"math"
+	"plane-producer/src/utils/test_utils"
+	"strconv"
 	"testing"
 )
 
-func TestPosition_CalcVector(t *testing.T) {
-	scenarios := []struct {
-		origin         Position
-		destination    Position
-		expectDistance float64
-		expectBearing  float64
-		maxDelta       float64
-	}{
-		{
-			origin:         Position{latitude: 0, longitude: 0},
-			destination:    Position{latitude: 0, longitude: 0},
-			expectDistance: 0,
-			expectBearing:  0,
-			maxDelta:       0,
-		},
-		{
-			origin:         Position{latitude: 0, longitude: 0},
-			destination:    Position{latitude: 1, longitude: 1},
-			expectDistance: 84.91,
-			expectBearing:  28.38,
-			maxDelta:       0.01,
-		},
-		{
-			origin:         Position{latitude: 1, longitude: 1},
-			destination:    Position{latitude: 0, longitude: 0},
-			expectDistance: 84.91,
-			expectBearing:  241.62,
-			maxDelta:       0.01,
-		},
-		{
-			origin:         Position{latitude: 5, longitude: 5},
-			destination:    Position{latitude: 6, longitude: 6},
-			expectDistance: 84.71,
-			expectBearing:  62.63,
-			maxDelta:       0.01,
-		},
-		{
-			origin:         Position{latitude: 5, longitude: 5},
-			destination:    Position{latitude: -6, longitude: -6},
-			expectDistance: 933.27,
-			expectBearing:  85.04,
-			maxDelta:       .01,
-		},
-		{
-			origin:         Position{latitude: 5, longitude: 5},
-			destination:    Position{latitude: -6, longitude: 6},
-			expectDistance: 663.16,
-			expectBearing:  54.48,
-			maxDelta:       .01,
-		},
-		{
-			origin:         Position{latitude: 5, longitude: 5},
-			destination:    Position{latitude: 6, longitude: -6},
-			expectDistance: 660.12,
-			expectBearing:  94.48,
-			maxDelta:       .01,
-		},
-		{
-			origin:         Position{latitude: 5, longitude: 5},
-			destination:    Position{latitude: 6, longitude: 5},
-			expectDistance: 60.04,
-			expectBearing:  0,
-			maxDelta:       .01,
-		},
-		{
-			origin:         Position{latitude: 5, longitude: 5},
-			destination:    Position{latitude: 5, longitude: 6},
-			expectDistance: 59.81,
-			expectBearing:  117.65,
-			maxDelta:       .01,
+func TestAircraft_Init(t *testing.T) {
+	a := Aircraft{}
+	tailNum := "ABC-123"
+	flightId := "F1234"
+
+	origin := &Airport{
+		iata: "ATL",
+		location: Position{
+			latitude:  33.640411,
+			longitude: -84.419853,
 		},
 	}
 
-	for i, s := range scenarios {
-		gotDistance := s.origin.CalcDistance(&s.destination)
-		gotBearing := s.origin.CalcBearing(&s.destination)
-
-		deltaDistance := math.Abs(gotDistance - s.expectDistance)
-		deltaBearing := math.Abs(gotBearing - s.expectBearing)
-
-		if deltaDistance > s.maxDelta {
-			t.Errorf("Failure on Scenario %d DISTANCE!\n"+
-					"Origin: %v\tDestination: %v\n"+
-					"Got: %f\tExpected: %f\tMax Delta: %f",
-				i, s.origin, s.destination, gotDistance, s.expectDistance, s.maxDelta)
-		}
-
-		if deltaBearing > s.maxDelta {
-			t.Errorf("Failure on Scenario %d BEARING!\n"+
-					"Origin: %v\tDestination: %v\n"+
-					"Got: %f\tExpected: %f\tMax Delta: %f",
-				i, s.origin, s.destination, gotBearing, s.expectBearing, s.maxDelta)
-		}
+	destination := &Airport{
+		iata: "LAX",
+		location: Position{
+			latitude:  33.942791,
+			longitude: -118.410042,
+		},
 	}
+
+	bearing, distance := origin.location.CalcVector(&destination.location)
+
+	a.Init(tailNum, flightId, origin, destination)
+
+	test_utils.ErrorIf(t, a.tailNum != tailNum, "tailNum", tailNum, a.tailNum)
+
+	test_utils.ErrorIf(t, a.flightId != flightId, "flightId", flightId, a.flightId)
+
+	test_utils.ErrorIf(t, a.origin != *origin, "origin", origin.String(), a.origin.String())
+
+	test_utils.ErrorIf(
+		t, a.destination != *destination, "destination", destination.String(), a.destination.String(),
+	)
+
+	test_utils.ErrorIf(
+		t, a.currentPos != a.origin.location, "currentPos", a.origin.String(), a.currentPos.String(),
+	)
+
+	test_utils.ErrorIf(
+		t, a.bearing != bearing, "bearing",
+		strconv.FormatFloat(bearing, 'f', 5, 64),
+		strconv.FormatFloat(a.bearing, 'f', 5, 64),
+	)
+
+	test_utils.ErrorIf(
+		t, a.nmiToDest != distance, "nmiToDest",
+		strconv.FormatFloat(distance, 'f', 5, 64),
+		strconv.FormatFloat(a.nmiToDest, 'f', 5, 64),
+	)
+
+	test_utils.ErrorIf(t, a.status != Idle, "status", string(Idle), string(a.status))
 }

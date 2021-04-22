@@ -42,7 +42,7 @@ func TestAircraft_Init(t *testing.T) {
 	)
 
 	test_utils.ErrorIf(
-		t, a.currentPos != a.origin.Location, "currentPos", a.origin.String(), a.currentPos.String(),
+		t, a.CurrentPos != a.origin.Location, "CurrentPos", a.origin.String(), a.CurrentPos.String(),
 	)
 
 	test_utils.ErrorIf(

@@ -147,11 +147,11 @@ func (a *Aircraft) Travel(seconds int, wait bool, report chan<- []byte) {
 			}
 		}
 
-		r, err := a.Report()
+		result, err := a.Report()
 		if err != nil {
 			log.Panicf("WARNING: Report failed for Aircraft with tailNum: %v", a.tailNum)
 		}
-		report <- r
+		report <- result
 	}()
 }
 

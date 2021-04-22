@@ -13,7 +13,7 @@ type Position struct {
 }
 
 func (p Position) String() string {
-	return fmt.Sprintf("Latitude: %f\tLongitude: %f", p.Latitude, p.Longitude)
+	return fmt.Sprintf("Position:{Latitude: %f,Longitude: %f}", p.Latitude, p.Longitude)
 }
 
 // CalcVector calculates the bearing and distance from an origin point to a destination point.

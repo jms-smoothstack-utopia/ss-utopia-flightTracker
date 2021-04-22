@@ -17,7 +17,7 @@ const (
 const (
 	taxiDistanceFromOrigin      = 2
 	awaitingLandingDistance     = 10
-	idleDistanceFromDestination = 0.1
+	idleDistanceFromDestination = 0.001
 )
 
 var ClearanceWaitSeconds = 120

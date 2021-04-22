@@ -25,6 +25,7 @@ func main() {
 
 	a.Init("AB-123", "F123", origin, destination)
 	a.HasClearance = true
+	domain.ClearanceWaitSeconds = 2
 
 	ch := make(chan []byte, 1)
 
